@@ -20,5 +20,15 @@ namespace GameCore.Services.Samples
             string json = PlayerPrefs.GetString(key);
             return JsonUtility.FromJson<T>(json);
         }
+        
+        public void Run()
+        {
+            
+        }
+
+        public void Release()
+        {
+            
+        }
     }
 }

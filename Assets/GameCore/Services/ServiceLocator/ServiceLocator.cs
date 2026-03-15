@@ -4,13 +4,14 @@
 
 using System;
 using System.Collections.Generic;
-using GameCore.Services.Samples;
 using UnityEngine;
 
 namespace GameCore.Services
 {
     public interface IService
     {
+        void Run();
+        void Release();
     }
 
     /// <summary>
@@ -38,7 +39,7 @@ namespace GameCore.Services
             {
                 if (_instance == null)
                 {
-                    _instance = FindObjectOfType<ServiceLocator>();
+                    _instance = FindFirstObjectByType<ServiceLocator>();
                     if (_instance == null)
                     {
                         GameObject go = new GameObject("[ServiceLocator]");
@@ -68,6 +69,8 @@ namespace GameCore.Services
         public static T Get<T>() where T : class => Instance.GetInternal<T>();
         public static bool TryGet<T>(out T service) where T : class => Instance.TryGetInternal(out service);
         public static void Unregister<T>() where T : class => Instance.UnregisterInternal<T>();
+        public static void Run() => Instance.RunInternal();
+        public static void Release() => Instance.ReleaseInternal();
         public static void Clear() => Instance.ClearInternal();
 
         // ---- Внутренние методы ----
@@ -138,7 +141,23 @@ namespace GameCore.Services
 
             _services.Remove(type);
         }
+        
+        private void RunInternal()
+        {
+            foreach (IService service in _services.Values)
+            {
+                service.Run();
+            }
+        }
 
+        private void ReleaseInternal()
+        {
+            foreach (IService service in _services.Values)
+            {
+                service.Release();
+            }
+        }
+        
         private void ClearInternal()
         {
             _services.Clear();

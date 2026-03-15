@@ -17,5 +17,15 @@ namespace GameCore.Services.Samples
         {
             _source.volume = volume;
         }
+
+        public void Run()
+        {
+            
+        }
+
+        public void Release()
+        {
+            
+        }
     }
 }
