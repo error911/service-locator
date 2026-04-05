@@ -69,8 +69,14 @@ namespace GameCore.Services
         public static T Get<T>() where T : class => Instance.GetInternal<T>();
         public static bool TryGet<T>(out T service) where T : class => Instance.TryGetInternal(out service);
         public static void Unregister<T>() where T : class => Instance.UnregisterInternal<T>();
+
+        /// <summary>Вызывает <see cref="IService.Run"/> у каждого зарегистрированного сервиса (каждый объект — один раз).</summary>
         public static void Run() => Instance.RunInternal();
+
+        /// <summary>Вызывает <see cref="IService.Release"/> у каждого сервиса и очищает реестр.</summary>
         public static void Release() => Instance.ReleaseInternal();
+
+        /// <summary>Только снимает регистрации; <see cref="IService.Release"/> не вызывается. Для штатного завершения используйте <see cref="Release"/>.</summary>
         public static void Clear() => Instance.ClearInternal();
 
         // ---- Внутренние методы ----
@@ -102,8 +108,13 @@ namespace GameCore.Services
                 throw new InvalidOperationException(
                     $"[ServiceLocator] Запрашиваемый тип {type} должен быть интерфейсом.");
 
-            if (_services.TryGetValue(type, out object service))
-                return service as T;
+            if (_services.TryGetValue(type, out object serviceObj))
+            {
+                if (serviceObj is T result)
+                    return result;
+                throw new InvalidOperationException(
+                    $"[ServiceLocator] Сервис для {type} зарегистрирован с несовместимой реализацией ({serviceObj?.GetType()}).");
+            }
 
             throw new InvalidOperationException($"[ServiceLocator] Сервис типа {type} не зарегистрирован.");
         }
@@ -141,29 +152,66 @@ namespace GameCore.Services
 
             _services.Remove(type);
         }
-        
-        private void RunInternal()
+
+        /// <summary>Уникальные экземпляры <see cref="IService"/> (один объект может быть зарегистрирован под несколькими интерфейсами).</summary>
+        private List<IService> CollectDistinctServices()
         {
-            foreach (IService service in _services.Values)
+            var list = new List<IService>();
+            var seen = new HashSet<object>();
+            foreach (object o in _services.Values)
             {
-                service.Run();
+                if (o is IService s && seen.Add(o))
+                    list.Add(s);
             }
+
+            return list;
         }
 
-        private void ReleaseInternal()
-        {
-            foreach (IService service in _services.Values)
-            {
-                service.Release();
-            }
-        }
-        
-        private void ClearInternal()
+        private void ResetRegistryInternal()
         {
             _services.Clear();
             _updatableServices.Clear();
             _toAdd.Clear();
             _toRemove.Clear();
+        }
+
+        private void RunInternal()
+        {
+            List<IService> snapshot = CollectDistinctServices();
+            foreach (IService service in snapshot)
+            {
+                try
+                {
+                    service.Run();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ServiceLocator] Ошибка в Run сервиса {service.GetType()}: {e}");
+                }
+            }
+        }
+
+        private void ReleaseInternal()
+        {
+            List<IService> snapshot = CollectDistinctServices();
+            foreach (IService service in snapshot)
+            {
+                try
+                {
+                    service.Release();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ServiceLocator] Ошибка в Release сервиса {service.GetType()}: {e}");
+                }
+            }
+
+            ResetRegistryInternal();
+        }
+
+        private void ClearInternal()
+        {
+            ResetRegistryInternal();
         }
 
         // ---- Управление списком обновляемых сервисов ----

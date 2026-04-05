@@ -15,6 +15,12 @@ namespace GameCore.Services.Samples
 
         public void SetVolume(float volume)
         {
+            if (_source == null)
+            {
+                Debug.LogWarning("[AudioService] AudioSource не назначен в инспекторе.");
+                return;
+            }
+
             _source.volume = volume;
         }
 

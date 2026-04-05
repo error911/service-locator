@@ -5,6 +5,7 @@ namespace GameCore.Services.Samples
 // Реализация сервиса сохранений
     public class SaveService : ISaveService
     {
+        // JsonUtility подходит для простых [Serializable]-типов; словари и полиморфизм не поддерживает.
         public void Save<T>(string key, T data)
         {
             string json = JsonUtility.ToJson(data);
