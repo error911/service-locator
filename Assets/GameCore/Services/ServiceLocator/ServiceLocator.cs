@@ -248,16 +248,16 @@ namespace GameCore.Services
         {
             _isUpdating = true;
 
-            // Вызываем Update у всех обновляемых сервисов
+            // Вызываем OnUpdate у всех обновляемых сервисов
             foreach (var updatable in _updatableServices)
             {
                 try
                 {
-                    updatable.Update();
+                    updatable.OnUpdate();
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError($"[ServiceLocator] Ошибка в Update сервиса {updatable.GetType()}: {e}");
+                    Debug.LogError($"[ServiceLocator] Ошибка в OnUpdate сервиса {updatable.GetType()}: {e}");
                 }
             }
 
