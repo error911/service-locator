@@ -31,6 +31,9 @@ namespace GameCore.Services
         private readonly List<IUpdatable> _updatableServices = new List<IUpdatable>();
         private readonly List<IUpdatable> _toAdd = new List<IUpdatable>(); // буфер для безопасного добавления
         private readonly List<IUpdatable> _toRemove = new List<IUpdatable>(); // буфер для безопасного удаления
+        private readonly List<IFixedUpdatable> _fixedUpdatableServices = new List<IFixedUpdatable>();
+        private readonly List<IFixedUpdatable> _toAddFixed = new List<IFixedUpdatable>(); // буфер для безопасного добавления (Fixed)
+        private readonly List<IFixedUpdatable> _toRemoveFixed = new List<IFixedUpdatable>(); // буфер для безопасного удаления (Fixed)
         private bool _isUpdating = false;
 
         public static ServiceLocator Instance
@@ -99,6 +102,12 @@ namespace GameCore.Services
             {
                 AddUpdatable(updatable);
             }
+
+            // Если сервис реализует IFixedUpdatable, добавим в список фиксированного обновления
+            if (service is IFixedUpdatable fixedUpdatable)
+            {
+                AddFixedUpdatable(fixedUpdatable);
+            }
         }
 
         private T GetInternal<T>() where T : class
@@ -148,6 +157,12 @@ namespace GameCore.Services
             if (service is IUpdatable updatable)
             {
                 RemoveUpdatable(updatable);
+            }
+
+            // Если удаляемый сервис реализует IFixedUpdatable, убираем его из списка фиксированного обновления
+            if (service is IFixedUpdatable fixedUpdatable)
+            {
+                RemoveFixedUpdatable(fixedUpdatable);
             }
 
             _services.Remove(type);
@@ -243,6 +258,35 @@ namespace GameCore.Services
             }
         }
 
+        // Методы управления списком FixedUpdatable
+        private void AddFixedUpdatable(IFixedUpdatable updatable)
+        {
+            if (_isUpdating)
+            {
+                // Если сейчас идёт перебор, добавляем в буфер, чтобы не сломать итерацию
+                if (!_toAddFixed.Contains(updatable))
+                    _toAddFixed.Add(updatable);
+            }
+            else
+            {
+                if (!_fixedUpdatableServices.Contains(updatable))
+                    _fixedUpdatableServices.Add(updatable);
+            }
+        }
+
+        private void RemoveFixedUpdatable(IFixedUpdatable updatable)
+        {
+            if (_isUpdating)
+            {
+                if (!_toRemoveFixed.Contains(updatable))
+                    _toRemoveFixed.Add(updatable);
+            }
+            else
+            {
+                _fixedUpdatableServices.Remove(updatable);
+            }
+        }
+
         // ---- Update driver ----
         private void Update()
         {
@@ -278,6 +322,43 @@ namespace GameCore.Services
                     _updatableServices.Remove(item);
                 _toRemove.Clear();
             }
+        }
+
+        private void FixedUpdate()
+        {
+            _isUpdating = true;
+
+            // Вызываем OnFixedUpdate у всех фиксированных обновляемых сервисов
+            foreach (var updatable in _fixedUpdatableServices)
+            {
+                try
+                {
+                    updatable.OnFixedUpdate();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[ServiceLocator] Ошибка в OnFixedUpdate сервиса {updatable.GetType()}: {e}");
+                }
+            }
+
+            _isUpdating = false;
+
+            // Применяем отложенные добавления и удаления для FixedUpdatable
+            if (_toAddFixed.Count > 0)
+            {
+                foreach (var item in _toAddFixed)
+                    if (!_fixedUpdatableServices.Contains(item))
+                        _fixedUpdatableServices.Add(item);
+                _toAddFixed.Clear();
+            }
+
+            if (_toRemoveFixed.Count > 0)
+            {
+                foreach (var item in _toRemoveFixed)
+                    _fixedUpdatableServices.Remove(item);
+                _toRemoveFixed.Clear();
+            }
+        }
         }
     }
 
